@@ -11,7 +11,7 @@ Built with PHP, MySQL/PostgreSQL, and vanilla HTML/CSS/JS. No frameworks, no bui
 
 ## What Is Bitcoin Cities?
 
-Bitcoin Cities makes Bitcoin adoption visible and measurable at the city level. Instead of abstract statistics, you see exactly which cities have the most Bitcoin-accepting businesses, who the most active community members are, and how adoption is growing over time.
+[Bitcoin Cities](https://bitcoincities.org/) makes Bitcoin adoption visible and measurable at the city level. Instead of abstract statistics, you see exactly which cities have the most Bitcoin-accepting businesses, who the most active community members are, and how adoption is growing over time.
 
 Users contribute by checking in at businesses that actually accept Bitcoin. Every check-in unlocks badges and helps their city climb the leaderboard. Businesses are imported directly from OpenStreetMap, so the data starts real and stays community-maintained.
 
@@ -654,6 +654,6 @@ The `isOpenNow()` function in `includes/functions.php` currently parses OSM open
 
 ## License
 
-Copyright (c) 2025 Bitcoin Cities. All rights reserved.
+Copyright (c) 2026 [Bitcoin Cities](https://bitcoincities.org/). All rights reserved.
 
 This software is proprietary. No part of this codebase may be reproduced, distributed, or transmitted in any form without the prior written permission of the copyright holder. For licensing inquiries, contact the project owner.

@@ -1,19 +1,11 @@
-# bitcoincities
+# Bitcoin Cities v1.7.5
 Bitcoin Cities is a community-driven platform that tracks every Bitcoin-accepting business across the United States. Cities compete on leaderboards based on the number of Bitcoin-friendly businesses, and users earn badges by checking in at those businesses in person.
 
-## Bitcoin Cities v1.7.2
+## Bitcoin Cities v1.7.5
 
 A gamified platform that turns local Bitcoin adoption into a competitive, community-driven movement. Cities compete on leaderboards based on the number of Bitcoin-accepting businesses, sourced from OpenStreetMap. Users earn badges by checking in at businesses in person, and everyone can track adoption progress through interactive maps, leaderboards, and challenges.
 
 Built with PHP, MySQL/PostgreSQL, and vanilla HTML/CSS/JS. No frameworks, no build tools, no npm. Just upload the files and run.
-
----
-
-## What Is Bitcoin Cities?
-
-[Bitcoin Cities](https://bitcoincities.org/) makes Bitcoin adoption visible and measurable at the city level. Instead of abstract statistics, you see exactly which cities have the most Bitcoin-accepting businesses, who the most active community members are, and how adoption is growing over time.
-
-Users contribute by checking in at businesses that actually accept Bitcoin. Every check-in unlocks badges and helps their city climb the leaderboard. Businesses are imported directly from OpenStreetMap, so the data starts real and stays community-maintained.
 
 ---
 
@@ -140,10 +132,14 @@ Completed challenges are displayed as pill badges on user public profiles.
 - Safe to re-run: duplicates are skipped by OSM ID
 
 ### AI-Powered Content (Optional)
+Three-provider system for business descriptions, plus city auto-fill:
+
+- **OpenAI (GPT-4o-mini)**: Fast bulk generation of 150-250 word descriptions. Best for quickly filling in content across all businesses. "Missing only" or "Regenerate all" modes with auto-continue
+- **Perplexity Sonar**: Live-web research phase. Searches the web, reviews, Reddit, news, and more to surface real, current data with inline citations. Research is stored in `perplexity_research` column for the writing phase to consume
+- **Claude (Anthropic)**: Writing and synthesis phase. Produces polished, publication-ready descriptions that synthesize Perplexity research with structured data. Consistent voice, less revision needed. Three modes: "Has research, missing description" (intended workflow), "Missing description (any)", or "Regenerate all"
 - **City auto-fill**: Uses OpenAI to auto-fill city details (population, main industries, description)
-- **Business descriptions**: Bulk-generate 150-250 word descriptions for business pages from the admin panel. Prompts are configurable via `DEFAULT_AI_BIZ_SYSTEM_PROMPT` and `DEFAULT_AI_BIZ_PROMPT` in `config/app.php`, or overridable via site settings in the admin panel
-- Requires an OpenAI API key (see installation instructions)
-- The platform works fully without AI — auto-generated templates fill in for all content
+
+All prompts are editable in the admin panel under **AI Settings**. API keys for all three providers are stored securely in the database via the same settings panel. The platform works fully without AI — auto-generated templates fill in for all content.
 
 ### User Profiles
 - Badge tier with tier-specific icon prominently displayed
@@ -186,8 +182,15 @@ Three-tier role system:
 - All editing requires active status (no 60-day inactivity gap)
 - Edits logged in the `edit_log` table
 
+### Password Reset
+- Forgot password flow with token-based reset via email
+- Rate-limited (5 requests per 60 minutes) to prevent abuse
+- Tokens expire after 1 hour
+- Constant-time response prevents email enumeration
+- "Forgot your password?" link on login page
+
 ### Email System
-- Lightweight PHP `mail()` wrapper for notifications and email verification
+- Lightweight PHP `mail()` wrapper for notifications, email verification, and password reset
 - Broadcast capabilities with admin controls
 - Support ticket notification emails for moderators/admins
 
@@ -231,7 +234,7 @@ Three-tier role system:
 | Database | MySQL 5.7+ / MariaDB 10.3+ / PostgreSQL 14+ |
 | Frontend | Server-side rendered HTML, CSS, vanilla JavaScript |
 | Maps | Leaflet.js + Leaflet.markercluster + OpenStreetMap tiles |
-| AI (optional) | OpenAI API (city auto-fill + business descriptions) |
+| AI (optional) | OpenAI API, Perplexity Sonar API, Anthropic Claude API |
 | Auth | Email/password with bcrypt + PHP sessions |
 | QR Codes | qrcode-generator@1.4.4 (CDN) |
 
@@ -293,6 +296,8 @@ bitcoin-cities/
 │   ├── support_ticket.php       # Individual ticket conversation
 │   ├── mod_panel.php            # Moderator/admin control panel
 │   ├── login.php                # Login form
+│   ├── forgot_password.php      # Forgot password form
+│   ├── reset_password.php       # Reset password form (token-based)
 │   ├── register.php             # Registration form
 │   ├── about.php                # About page (how it works, ambassador system, data sources)
 │   ├── terms.php                # Terms of service
@@ -311,7 +316,10 @@ bitcoin-cities/
 └── sql/
     ├── schema_postgres.sql      # PostgreSQL database schema
     ├── schema_mysql.sql         # MySQL database schema
-    └── migration_v6_business_ai_description.sql  # Adds ai_description column to businesses
+    ├── migration_v6_business_ai_description.sql  # Adds ai_description column to businesses
+    ├── migration_v7_perplexity_research.sql     # Adds perplexity_research column to businesses
+    ├── migration_v8_security_hardening.sql      # Slug indexes + unique constraints
+    └── migration_v9_password_reset.sql          # Password reset columns on users table
 ```
 
 ---
@@ -408,17 +416,26 @@ Once logged in as admin:
 
 ### Step 7 (Optional): Enable AI Content Generation
 
-AI powers two features: city auto-fill (population, industries, description) and business page descriptions. To enable:
+AI powers city auto-fill and a three-provider business description pipeline. API keys can be entered in the **Mod Panel > Settings > AI Settings** panel (stored securely in the database), or via `.env` for OpenAI.
 
+**OpenAI** (fast bulk descriptions + city auto-fill):
 1. Get an API key from [OpenAI](https://platform.openai.com/api-keys)
-2. Add it to your `.env` file:
-```env
-OPENAI_API_KEY=sk-your-openai-api-key-here
-```
-3. In the **Mod Panel > Admin Tools**, use:
-   - **AI City Descriptions** to auto-fill city detail pages
-   - **AI Business Descriptions** to generate 150-250 word descriptions for business pages in bulk
-4. The platform works fully without AI — auto-generated templates provide unique content for every page
+2. Enter it in **AI Settings** or add to `.env`: `OPENAI_API_KEY=sk-your-key`
+
+**Perplexity Sonar** (live-web research):
+1. Get an API key from [Perplexity](https://docs.perplexity.ai/)
+2. Enter it in **AI Settings**
+
+**Claude / Anthropic** (polished writing):
+1. Get an API key from [Anthropic](https://console.anthropic.com/)
+2. Enter it in **AI Settings**
+
+**Recommended workflow:**
+1. Run **Perplexity Research** to gather real, cited web data for each business
+2. Run **Claude Descriptions** (mode: "Has research, missing description") to synthesize research into polished descriptions
+3. Or use **OpenAI Business Descriptions** for faster, simpler generation without the research step
+
+All prompts are editable in **AI Settings**. The platform works fully without AI — auto-generated templates provide unique content for every page.
 
 ### Step 8 (Optional): Set Up Cron for OSM Sync
 
@@ -547,6 +564,8 @@ All API endpoints are under `/api/` and return JSON.
 | POST | `/api/auth/register` | No | Create account |
 | POST | `/api/auth/login` | No | Log in |
 | POST | `/api/auth/logout` | Yes | Log out |
+| POST | `/api/auth/forgot-password` | No | Request password reset email |
+| POST | `/api/auth/reset-password` | No | Reset password with token |
 | GET | `/api/auth/me` | Yes | Get current user |
 | GET | `/api/cities` | No | List cities (paginated, filterable) |
 | GET | `/api/cities/top` | No | Top cities by business count |
@@ -564,7 +583,9 @@ All API endpoints are under `/api/` and return JSON.
 | PATCH | `/api/business-edits?business_id=X` | Amb | Edit business details (hours, phone, website, cuisine) |
 | POST | `/api/admin/generate-slugs` | Admin | Backfill SEO slugs for all records |
 | POST | `/api/admin/generate-city-descriptions` | Admin | AI-generate city descriptions in bulk |
-| POST | `/api/admin/generate-business-descriptions` | Admin | AI-generate business descriptions in bulk |
+| POST | `/api/admin/generate-business-descriptions` | Admin | AI-generate business descriptions via OpenAI |
+| POST | `/api/admin/generate-perplexity-research` | Admin | Research businesses via Perplexity Sonar |
+| POST | `/api/admin/generate-claude-descriptions` | Admin | Generate descriptions via Claude/Anthropic |
 | GET | `/api/admin/businesses-without-descriptions` | Admin | Count businesses missing AI descriptions |
 | POST | `/api/admin/normalize-states` | Admin | Fix inconsistent state names |
 | POST | `/api/admin/merge-duplicate-cities` | Admin | Merge cities with duplicate names |
@@ -575,6 +596,52 @@ All API endpoints are under `/api/` and return JSON.
 ---
 
 ## Changelog
+
+### v1.7.5
+- **Password reset flow:** Full forgot/reset password system with token-based email links, 1-hour expiry, rate limiting (5/60min), and constant-time responses to prevent email enumeration. New pages: `forgot_password.php`, `reset_password.php`. New API endpoints: `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`. "Forgot your password?" link added to login page
+- **User deletion cascade:** Admin user deletion now properly cleans up all referencing tables: `ambassadors`, `user_reputation`, `challenge_progress`, `user_achievements`, `support_messages`, `support_tickets`, `edit_log`, `mod_notes` (in addition to existing `business_verifications`, `comments`, `user_activity`, `tips`)
+- **Rising Stars state filter:** Leaderboard Rising Stars tab now respects the state dropdown filter (was previously showing all states regardless of selection)
+- Migration: `sql/migration_v9_password_reset.sql` — adds `password_reset_token` and `password_reset_expires` columns to `users` table
+
+### v1.7.4
+- **Security hardening for production launch:**
+  - Session cookies now set with `Secure`, `HttpOnly`, and `SameSite=Lax` flags
+  - XSS fix: `addslashes()` replaced with `json_encode()` in all JS contexts (support_ticket.php, login.php)
+  - XSS fix: dashboard `$hintText` now escaped with `e()`
+  - CSRF fix: reputation voting now uses `apiFetch()` instead of raw `fetch()` (votes were silently failing)
+  - SQL injection prevention: `$scopeCol` in `ensureUniqueSlug()` now allow-listed
+  - Host header injection: `SITE_URL` fallback sanitizes `HTTP_HOST` to alphanumeric characters
+  - Rate limiter now fails closed (blocks requests) on database errors instead of allowing them
+  - Blocked users are now immediately logged out on next request (session destroyed in `currentUser()`)
+  - API route matching tightened to exact segment boundaries (prevents prefix collision)
+  - Cron API files (`cron_merge_cities.php`, `cron_fix_city_slugs.php`) reject direct access outside front controller
+  - `apiFetch()` now handles non-JSON responses gracefully (502s, HTML error pages)
+  - IP spoofing hardened: `getClientIP()` walks X-Forwarded-For right-to-left, skipping all private/reserved IPs
+- **Merge script improvements:**
+  - MySQL-only `REGEXP` replaced with portable `LIKE` clauses
+  - No-op `business_verifications` query removed
+  - All merge operations wrapped in database transactions with rollback on failure
+  - `user_activity` records now moved during merges (previously orphaned)
+- **Performance & reliability:**
+  - Added indexes on `cities.slug`, `businesses.slug`, `users.slug` for faster URL routing
+  - Challenges page: N+1 queries eliminated — progress records batch-loaded, same-type calculations cached, unchanged progress skipped
+  - OSM cron sync: file lock (`flock`) prevents overlapping runs
+- **Bug fixes:**
+  - `daily_streak` now counts actual consecutive days (was counting total distinct days)
+  - Open Now filter: US timezone estimation replaced with proper zone boundaries (Eastern/Central/Mountain/Pacific/Alaska/Hawaii) with DST support
+  - `isMobile` now updates on window resize (was set once on page load)
+  - `.env` parser now strips surrounding quotes from values
+  - Navbar z-index raised above map controls to prevent overlap
+- Migration: `sql/migration_v8_security_hardening.sql` — slug indexes + unique constraints
+
+### v1.7.3
+- Three-provider AI business description system: OpenAI (fast bulk), Perplexity Sonar (live-web research with citations), Claude (polished writing that synthesizes research)
+- Perplexity research stored in new `perplexity_research` column; Claude and OpenAI write to `ai_description`
+- All AI prompts (OpenAI, Perplexity, Claude) editable in admin AI Settings panel with "Reset to Defaults" button
+- API keys for Perplexity and Anthropic stored in `site_settings` via admin panel (no `.env` needed)
+- OpenAI business descriptions now have "Missing only" / "Regenerate all" mode dropdown (matching city descriptions)
+- Claude has three modes: "Has research, missing description" (intended Perplexity→Claude workflow), "Missing description (any)", "Regenerate all"
+- Migration: `sql/migration_v7_perplexity_research.sql` adds `perplexity_research TEXT` column to businesses
 
 ### v1.7.2
 - Landing page FAQ section with six dropdown questions and FAQPage schema.org markup
